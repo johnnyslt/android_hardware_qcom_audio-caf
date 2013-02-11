@@ -80,18 +80,21 @@ class AudioHardwareALSA;
 #define PLAYBACK_LOW_LATENCY_MEASURED  42000
 #ifdef TARGET_8974
 #define DEFAULT_IN_BUFFER_SIZE 512
+#define MIN_CAPTURE_BUFFER_SIZE_PER_CH   512
+#define VOIP_BUFFER_SIZE_8K    512
+#define VOIP_BUFFER_SIZE_16K   1024
 #else
 #define DEFAULT_IN_BUFFER_SIZE 320
-#endif
 #define MIN_CAPTURE_BUFFER_SIZE_PER_CH   320
+#define VOIP_BUFFER_SIZE_8K    320
+#define VOIP_BUFFER_SIZE_16K   640
+#endif
 #define MAX_CAPTURE_BUFFER_SIZE_PER_CH   2048
 #define FM_BUFFER_SIZE        1024
 
 #define VOIP_SAMPLING_RATE_8K 8000
 #define VOIP_SAMPLING_RATE_16K 16000
 #define VOIP_DEFAULT_CHANNEL_MODE  1
-#define VOIP_BUFFER_SIZE_8K    320
-#define VOIP_BUFFER_SIZE_16K   640
 #define VOIP_BUFFER_MAX_SIZE   VOIP_BUFFER_SIZE_16K
 #define VOIP_PLAYBACK_LATENCY      6400
 #define VOIP_RECORD_LATENCY        6400
@@ -268,6 +271,9 @@ public:
 #ifdef QCOM_CSDCLIENT_ENABLED
     void     setCsdHandle(void*);
 #endif
+#ifdef QCOM_ACDB_ENABLED
+    void     setACDBHandle(void*);
+#endif
 
 protected:
     friend class AudioHardwareALSA;
@@ -308,6 +314,7 @@ private:
     int mBtscoSamplerate;
     ALSAUseCaseList mUseCaseList;
     void *mcsd_handle;
+    void *macdb_handle;
     int mCallMode;
     struct mixer*  mMixer;
     int mInChannels;
@@ -561,6 +568,7 @@ private:
     static void *       eventThreadWrapper(void *me);
     void                eventThreadEntry();
     void                reset();
+    status_t            drainAndPostEOS_l();
 
     //Structure to hold mem buffer information
     class BuffersAllocated {
@@ -656,7 +664,7 @@ public:
     {
         return BAD_VALUE;
     }
-   
+
     virtual status_t removeAudioEffect(effect_handle_t effect)
     {
         return BAD_VALUE;

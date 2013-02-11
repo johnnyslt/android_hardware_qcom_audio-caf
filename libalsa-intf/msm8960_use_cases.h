@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2013, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -10,7 +10,7 @@
  *     copyright notice, this list of conditions and the following
  *     disclaimer in the documentation and/or other materials provided
  *     with the distribution.
- *   * Neither the name of Code Aurora Forum, Inc. nor the names of its
+ *   * Neither the name of The Linux Foundation nor the names of its
  *     contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -284,6 +284,7 @@ static card_mapping_t card_mapping_list[] = {
 #define SND_USE_CASE_DEV_SPDIF_SPEAKER_ANC_HEADSET "SPDIF Speaker ANC Headset"
 #define SND_USE_CASE_DEV_DUMMY_TX "Dummy Tx"
 #define SND_USE_CASE_DEV_PROXY_RX_SPEAKER     "PROXY Rx Speaker"
+#define SND_USE_CASE_DEV_USB_PROXY_RX_SPEAKER     "USB PROXY Rx Speaker"
 #define SND_USE_CASE_DEV_PROXY_RX_HANDSET     "PROXY Rx Earpiece"
 #define SND_USE_CASE_DEV_PROXY_RX_HEADSET     "PROXY Rx Headphones"
 #define SND_USE_CASE_DEV_PROXY_RX_ANC_HEADSET     "PROXY Rx ANC Headset"

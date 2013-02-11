@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2013, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -10,7 +10,7 @@
  *     copyright notice, this list of conditions and the following
  *     disclaimer in the documentation and/or other materials provided
  *     with the distribution.
- *   * Neither the name of Code Aurora Forum, Inc. nor the names of its
+ *   * Neither the name of The Linux Foundation nor the names of its
  *     contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -761,6 +761,12 @@ int ctrl_list_type)
 
     verb_list = uc_mgr->card_ctxt_ptr->use_case_verb_list;
     verb_index = uc_mgr->card_ctxt_ptr->current_verb_index;
+
+    if (verb_index < 0) {
+        ALOGE("Invalid verb_index %d", verb_index);
+        return -EINVAL;
+    }
+
     if (ctrl_list_type == CTRL_LIST_VERB) {
         ctrl_list =
             uc_mgr->card_ctxt_ptr->use_case_verb_list[verb_index].verb_ctrls;
@@ -773,9 +779,9 @@ int ctrl_list_type)
     } else {
         ctrl_list = NULL;
     }
-    if((verb_index < 0) ||
-      (!strncmp(uc_mgr->card_ctxt_ptr->current_verb, SND_UCM_END_OF_LIST, 3)) ||
-      (ctrl_list == NULL) || (ctrl_list[index].case_name == NULL)) {
+
+    if (!strncmp(uc_mgr->card_ctxt_ptr->current_verb, SND_UCM_END_OF_LIST, 3) ||
+       (ctrl_list == NULL) || (ctrl_list[index].case_name == NULL)) {
         ALOGE("Invalid current verb value: %s - %d",
                 uc_mgr->card_ctxt_ptr->current_verb, verb_index);
         return -EINVAL;

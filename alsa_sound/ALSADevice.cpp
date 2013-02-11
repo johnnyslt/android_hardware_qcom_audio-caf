@@ -30,8 +30,8 @@
 #include <sound/a2220.h>
 #endif
 
-#ifdef QCOM_CSDCLIENT_ENABLED
 extern "C" {
+#ifdef QCOM_CSDCLIENT_ENABLED
 static int (*csd_disable_device)();
 static int (*csd_enable_device)(int, int, uint32_t);
 static int (*csd_volume)(int);
@@ -43,11 +43,13 @@ static int (*csd_start_voice)();
 static int (*csd_stop_voice)();
 static int (*csd_client_volume)(int);
 static int (*csd_client_mic_mute)(int);
-}
 #endif
+#ifdef QCOM_ACDB_ENABLED
+static int (*acdb_loader_get_ecrx_device)(int acdb_id);
+#endif
+}
 
 #define SAMPLE_RATE_8KHZ 8000
-
 
 #define BTSCO_RATE_16KHZ 16000
 #define USECASE_TYPE_RX 1
@@ -473,7 +475,8 @@ void ALSADevice::switchDevice(alsa_handle_t *handle, uint32_t devices, uint32_t 
             devices = devices | (AudioSystem::DEVICE_OUT_WIRED_HEADPHONE |
                       AudioSystem::DEVICE_IN_BUILTIN_MIC);
         } else if ((devices & AudioSystem::DEVICE_OUT_EARPIECE) ||
-                  (devices & AudioSystem::DEVICE_IN_BUILTIN_MIC)) {
+                  (devices & AudioSystem::DEVICE_IN_BUILTIN_MIC) ||
+                  (devices & AudioSystem::DEVICE_OUT_ANLG_DOCK_HEADSET)) {
             devices = devices | (AudioSystem::DEVICE_IN_BUILTIN_MIC |
                       AudioSystem::DEVICE_OUT_EARPIECE);
         } else if (devices & AudioSystem::DEVICE_OUT_SPEAKER) {
@@ -642,6 +645,36 @@ void ALSADevice::switchDevice(alsa_handle_t *handle, uint32_t devices, uint32_t 
     }
 #endif
     ALOGD("switchDevice: mCurTxUCMDevivce %s mCurRxDevDevice %s", mCurTxUCMDevice, mCurRxUCMDevice);
+#ifdef QCOM_ACDB_ENABLED
+    if (((devices & AudioSystem::DEVICE_IN_BUILTIN_MIC) || (devices & AudioSystem::DEVICE_IN_BACK_MIC))
+        && (mInChannels == 1)) {
+        ALOGD("switchDevice:use device %x for channels:%d usecase:%s",devices,handle->channels,handle->useCase);
+        int ec_acdbid;
+        char *ec_dev;
+        char *ec_rx_dev;
+        memset(&ident,0,sizeof(ident));
+        strlcpy(ident, "ACDBID/", sizeof(ident));
+        strlcat(ident, mCurTxUCMDevice, sizeof(ident));
+        tx_dev_id = snd_use_case_get(handle->ucMgr, ident, NULL);
+        if (acdb_loader_get_ecrx_device) {
+            ec_acdbid = acdb_loader_get_ecrx_device(tx_dev_id);
+            ec_dev = getUCMDeviceFromAcdbId(ec_acdbid);
+            if (ec_dev) {
+                memset(&ident,0,sizeof(ident));
+                strlcpy(ident, "EC_REF_RXMixerCTL/", sizeof(ident));
+                strlcat(ident, ec_dev, sizeof(ident));
+                snd_use_case_get(handle->ucMgr, ident, (const char **)&ec_rx_dev);
+                ALOGD("SwitchDevice: ec_ref_rx_acdbid:%d ec_dev:%s ec_rx_dev:%s", ec_acdbid, ec_dev, ec_rx_dev);
+                if (ec_rx_dev) {
+                    setEcrxDevice(ec_rx_dev);
+                    free(ec_rx_dev);
+                }
+            }
+        } else {
+            ALOGE("dlsym:Error:%s Loading acdb_loader_get_ecrx_device", dlerror());
+        }
+    }
+#endif
     if (platform_is_Fusion3() && (inCallDevSwitch == true)) {
 
         /* get tx acdb id */
@@ -1475,10 +1508,28 @@ char* ALSADevice::getUCMDevice(uint32_t devices, int input, char *rxDevice)
         } else if ((devices & AudioSystem::DEVICE_OUT_ANLG_DOCK_HEADSET ||
                     devices & AudioSystem::DEVICE_OUT_DGTL_DOCK_HEADSET) &&
                     devices & AudioSystem::DEVICE_OUT_SPEAKER) {
-             return strdup(SND_USE_CASE_DEV_PROXY_RX_SPEAKER); /* PROXY RX */
+             ALOGD("getUCMDevice for output device: devices:%x is input device:%d, reached debug #1",devices,input);
+#ifdef DOCK_USBAUDIO_ENABLED
+             if (mCallMode == AUDIO_MODE_RINGTONE) {
+                 return strdup(SND_USE_CASE_DEV_SPEAKER); /* Voice SPEAKER RX */
+             } else {
+                 return strdup(SND_USE_CASE_DEV_DOCK);
+             }
+#else
+             return strdup(SND_USE_CASE_DEV_PROXY_RX); /* PROXY RX */
+#endif
         } else if ((devices & AudioSystem::DEVICE_OUT_ANLG_DOCK_HEADSET) ||
                   (devices & AudioSystem::DEVICE_OUT_DGTL_DOCK_HEADSET)) {
+             ALOGD("getUCMDevice for output device: devices:%x is input device:%d, reached debug #2",devices,input);
+#ifdef DOCK_USBAUDIO_ENABLED
+             if (mCallMode == AUDIO_MODE_RINGTONE) {
+                 return strdup(SND_USE_CASE_DEV_USB_PROXY_RX); /* PROXY RX */
+             } else {
+                 return strdup(SND_USE_CASE_DEV_DOCK); /* Dock RX */
+             }
+#else
              return strdup(SND_USE_CASE_DEV_USB_PROXY_RX); /* PROXY RX */
+#endif
 #ifdef QCOM_PROXY_DEVICE_ENABLED
         } else if( (devices & AudioSystem::DEVICE_OUT_SPEAKER) &&
                    (devices & AudioSystem::DEVICE_OUT_PROXY) &&
@@ -2472,5 +2523,17 @@ void  ALSADevice::setCsdHandle(void* handle)
     csd_client_mic_mute = (int (*)(int))::dlsym(mcsd_handle,"csd_client_mic_mute");
 }
 #endif
+
+
+#ifdef QCOM_ACDB_ENABLED
+void  ALSADevice::setACDBHandle(void* handle)
+{
+    macdb_handle = static_cast<void*>(handle);
+    ALOGI("%s ACDB_handle: %p", __func__, macdb_handle);
+
+    acdb_loader_get_ecrx_device = (int (*)(int))::dlsym(macdb_handle,"acdb_loader_get_ecrx_device");
+}
+#endif
+
 
 }
