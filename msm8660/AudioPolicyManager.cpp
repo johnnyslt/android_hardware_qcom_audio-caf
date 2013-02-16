@@ -155,7 +155,7 @@ audio_devices_t AudioPolicyManager::getDeviceForStrategy(routing_strategy strate
             }
             break;
         }
-#ifdef QCOM_FM_ENABLED
+#if defined(QCOM_FM_ENABLED) || defined(STE_FM)
         if (mAvailableOutputDevices & AUDIO_DEVICE_OUT_FM) {
             device |= AUDIO_DEVICE_OUT_FM;
             if (mForceUse[AudioSystem::FOR_MEDIA] == AudioSystem::FORCE_SPEAKER) {
@@ -215,7 +215,7 @@ audio_devices_t AudioPolicyManager::getDeviceForStrategy(routing_strategy strate
         if (device2 == 0) {
             device2 = mAvailableOutputDevices & AUDIO_DEVICE_OUT_WIRED_HEADSET;
         }
-#ifdef QCOM_FM_ENABLED
+#if defined(QCOM_FM_ENABLED) || defined(STE_FM)
         if (device2 == 0) {
             device2 = mAvailableOutputDevices & AUDIO_DEVICE_OUT_FM_TX;
         }
@@ -251,7 +251,7 @@ audio_devices_t AudioPolicyManager::getDeviceForStrategy(routing_strategy strate
             device = mAvailableOutputDevices & AUDIO_DEVICE_OUT_SPEAKER;
             break;
         }
-#ifdef QCOM_FM_ENABLED
+#if defined(QCOM_FM_ENABLED) || defined(STE_FM)
         if (mAvailableOutputDevices & AUDIO_DEVICE_OUT_FM) {
             device |= AUDIO_DEVICE_OUT_FM;
         }
@@ -1257,7 +1257,7 @@ audio_devices_t AudioPolicyManager::getDeviceForInputSource(int inputSource)
         }
         break;
 
-#ifdef QCOM_FM_ENABLED
+#if defined (QCOM_FM_ENABLED) || defined(STE_FM)
    case AUDIO_SOURCE_FM_RX:
         device = AUDIO_DEVICE_IN_FM_RX;
         break;

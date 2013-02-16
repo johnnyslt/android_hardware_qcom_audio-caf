@@ -105,8 +105,10 @@ static uint32_t audio_device_conv_table[][HAL_API_REV_NUM] =
 #ifdef QCOM_ANC_HEADSET_ENABLED
     { AudioSystem::DEVICE_IN_ANC_HEADSET, AUDIO_DEVICE_IN_ANC_HEADSET },
 #endif
-#ifdef QCOM_FM_ENABLED
+#if defined(QCOM_FM_ENABLED) || defined(STE_FM)
     { AudioSystem::DEVICE_IN_FM_RX, AUDIO_DEVICE_IN_FM_RX },
+#endif
+#ifdef QCOM_FM_ENABLED
     { AudioSystem::DEVICE_IN_FM_RX_A2DP, AUDIO_DEVICE_IN_FM_RX_A2DP },
 #endif
 };
