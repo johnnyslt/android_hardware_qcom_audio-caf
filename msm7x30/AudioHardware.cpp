@@ -976,8 +976,8 @@ String8 AudioHardware::getParameters(const String8& keys)
     if ( param.get(key,value) == NO_ERROR ) {
         param.addInt(String8("AMR"), true );
         if (build_id[17] != '1') {
-          param.addInt(String8("EVRC"), true );
-          param.addInt(String8("QCELP"), true );
+            param.addInt(String8("EVRC"), true );
+            param.addInt(String8("QCELP"), true );
         }
     }
 
@@ -3487,7 +3487,12 @@ void* AudioHardware::AudioSessionOutLPA::memBufferAlloc(int nSize, int32_t *ion_
 
     alloc_data.len =   nSize;
     alloc_data.align = 0x1000;
+#ifndef NEW_ION_API
     alloc_data.flags = ION_HEAP(ION_AUDIO_HEAP_ID);
+#else
+    alloc_data.heap_mask = ION_HEAP(ION_AUDIO_HEAP_ID);
+    alloc_data.flags = 0;
+#endif
     int rc = ioctl(ionfd, ION_IOC_ALLOC, &alloc_data);
     if (rc) {
         ALOGE("ION_IOC_ALLOC ioctl failed\n");

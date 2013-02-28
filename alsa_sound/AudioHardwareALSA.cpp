@@ -128,26 +128,6 @@ AudioHardwareALSA::AudioHardwareALSA() :
     mALSADevice->setACDBHandle(mAcdbHandle);
 #endif
 
-#ifdef QCOM_CSDCLIENT_ENABLED
-             mCsdHandle = ::dlopen("/system/lib/libcsd-client.so", RTLD_NOW);
-             if (mCsdHandle == NULL) {
-                 ALOGE("AudioHardware: DLOPEN not successful for CSD CLIENT");
-             } else {
-                 ALOGD("AudioHardware: DLOPEN successful for CSD CLIENT");
-                 csd_client_init = (int (*)())::dlsym(mCsdHandle,"csd_client_init");
-                 csd_client_deinit = (int (*)())::dlsym(mCsdHandle,"csd_client_deinit");
-                 csd_start_playback = (int (*)())::dlsym(mCsdHandle,"csd_client_start_playback");
-                 csd_stop_playback = (int (*)())::dlsym(mCsdHandle,"csd_client_stop_playback");
-
-                 if (csd_client_init == NULL) {
-                     ALOGE("dlsym: Error:%s Loading csd_client_init", dlerror());
-                 } else {
-                     csd_client_init();
-                 }
-
-             }
-             mALSADevice->setCsdHandle(mCsdHandle);
-#endif
     if((fp = fopen("/proc/asound/cards","r")) == NULL) {
         ALOGE("Cannot open /proc/asound/cards file to get sound card info");
     } else {
@@ -242,6 +222,29 @@ AudioHardwareALSA::AudioHardwareALSA() :
         }
     }
 
+#ifdef QCOM_CSDCLIENT_ENABLED
+    if (mFusion3Platform) {
+        mCsdHandle = ::dlopen("/system/lib/libcsd-client.so", RTLD_NOW);
+        if (mCsdHandle == NULL) {
+            ALOGE("AudioHardware: DLOPEN not successful for CSD CLIENT");
+        } else {
+            ALOGD("AudioHardware: DLOPEN successful for CSD CLIENT");
+            csd_client_init = (int (*)())::dlsym(mCsdHandle,"csd_client_init");
+            csd_client_deinit = (int (*)())::dlsym(mCsdHandle,"csd_client_deinit");
+            csd_start_playback = (int (*)())::dlsym(mCsdHandle,"csd_client_start_playback");
+            csd_stop_playback = (int (*)())::dlsym(mCsdHandle,"csd_client_stop_playback");
+
+            if (csd_client_init == NULL) {
+                ALOGE("dlsym: Error:%s Loading csd_client_init", dlerror());
+            } else {
+                csd_client_init();
+            }
+
+        }
+        mALSADevice->setCsdHandle(mCsdHandle);
+    }
+#endif
+
     if (mUcMgr < 0) {
         ALOGE("Failed to open ucm instance: %d", errno);
     } else {
@@ -327,16 +330,18 @@ AudioHardwareALSA::~AudioHardwareALSA()
     delete mAudioUsbALSA;
 #endif
 
-#ifdef QCOM_CSDCLEINT_ENABLED
-     if (mCsdHandle) {
-        if (csd_client_deinit == NULL) {
-            ALOGE("dlsym: Error:%s Loading csd_client_deinit", dlerror());
-        } else {
-            csd_client_deinit();
+#ifdef QCOM_CSDCLIENT_ENABLED
+    if (mFusion3Platform) {
+        if (mCsdHandle) {
+            if (csd_client_deinit == NULL) {
+                ALOGE("dlsym: Error:%s Loading csd_client_deinit", dlerror());
+            } else {
+                csd_client_deinit();
+            }
+            ::dlclose(mCsdHandle);
+            mCsdHandle = NULL;
         }
-        ::dlclose(mCsdHandle);
-        mCsdHandle = NULL;
-     }
+    }
 #endif
 }
 
@@ -642,10 +647,14 @@ status_t AudioHardwareALSA::setParameters(const String8& keyValuePairs)
     key = String8(MODE_CALL_KEY);
     if (param.getInt(key,state) == NO_ERROR) {
         if (mCallState != state) {
+            if(!((!(mCallState & 0xF) && ((state & 0xF) ==  CS_ACTIVE)) ||
+                 (!(mCallState & 0xF0) && ((state & 0xF0) == IMS_ACTIVE)) ||
+                 (!(mCallState & 0xF00) && ((state & 0xF00) == CS_ACTIVE_SESSION2)))) {
+                mCallState = state;
+                doRouting(0);
+            }
             mCallState = state;
-            doRouting(0);
         }
-        mCallState = state;
     }
     if (param.size()) {
         status = BAD_VALUE;
@@ -1194,22 +1203,8 @@ AudioHardwareALSA::openOutputStream(uint32_t devices,
         mDeviceList.push_back(alsa_handle);
         ALSAHandleList::iterator it = mDeviceList.end();
         it--;
-        ALOGD("it->useCase %s", it->useCase);
-        mALSADevice->route(&(*it), devices, mode());
-        if(!strcmp(it->useCase, SND_USE_CASE_VERB_HIFI2)) {
-            snd_use_case_set(mUcMgr, "_verb", SND_USE_CASE_VERB_HIFI2 );
-        } else {
-            snd_use_case_set(mUcMgr, "_enamod", SND_USE_CASE_MOD_PLAY_MUSIC2);
-        }
-        ALOGD("channels: %d", AudioSystem::popCount(*channels));
-        err = mALSADevice->open(&(*it));
-
-        if (err) {
-            ALOGE("Device open failed err:%d",err);
-        } else {
-            out = new AudioStreamOutALSA(this, &(*it));
-            err = out->set(format, channels, sampleRate, devices);
-        }
+        out = new AudioStreamOutALSA(this, &(*it));
+        err = out->set(format, channels, sampleRate, devices);
         if (status) *status = err;
         return out;
     } else {
@@ -2304,12 +2299,14 @@ status_t AudioHardwareALSA::openExtOutput(int device) {
             ALOGE("openA2DPOutput failed = %d",err);
             return err;
         }
-    } else if (device & AUDIO_DEVICE_OUT_ALL_USB) {
+        mExtOutStream = mA2dpStream;
+    } else if (device & AudioSystem::DEVICE_OUT_ALL_USB) {
         err= openUsbOutput();
         if(err) {
-        ALOGE("openUsbPOutput failed = %d",err);
-        return err;
+            ALOGE("openUsbPOutput failed = %d",err);
+            return err;
         }
+        mExtOutStream = mUsbStream;
     }
     return err;
 }

@@ -102,6 +102,7 @@ ALSADevice::ALSADevice() {
     mMixer = mixer_open("/dev/snd/controlC0");
 
     mProxyParams.mExitRead = false;
+    mProxyParams.mPfdProxy[1].fd = -1;
     resetProxyVariables();
     mProxyParams.mCaptureBufferSize = AFE_PROXY_PERIOD_SIZE;
     mProxyParams.mCaptureBuffer = NULL;
@@ -693,15 +694,17 @@ void ALSADevice::switchDevice(alsa_handle_t *handle, uint32_t devices, uint32_t 
             tx_dev_id = DEVICE_SPEAKER_TX_ACDB_ID;
         }
 
-#ifdef QCOM_CSDCLIENT_ENABLED
         ALOGV("rx_dev_id=%d, tx_dev_id=%d\n", rx_dev_id, tx_dev_id);
-        if (csd_enable_device == NULL) {
-            ALOGE("dlsym:Error:%s Loading csd_client_enable_device", dlerror());
-        } else {
-            err = csd_enable_device(rx_dev_id, tx_dev_id, mDevSettingsFlag);
-            if (err < 0)
-            {
-                ALOGE("csd_client_disable_device failed, error %d", err);
+#ifdef QCOM_CSDCLIENT_ENABLED
+        if (platform_is_Fusion3()) {
+            if (csd_enable_device == NULL) {
+                ALOGE("dlsym:Error:%s Loading csd_client_enable_device", dlerror());
+            } else {
+                err = csd_enable_device(rx_dev_id, tx_dev_id, mDevSettingsFlag);
+                if (err < 0)
+                {
+                    ALOGE("csd_client_disable_device failed, error %d", err);
+                }
             }
         }
 #endif
@@ -1516,7 +1519,7 @@ char* ALSADevice::getUCMDevice(uint32_t devices, int input, char *rxDevice)
                  return strdup(SND_USE_CASE_DEV_DOCK);
              }
 #else
-             return strdup(SND_USE_CASE_DEV_PROXY_RX); /* PROXY RX */
+             return strdup(SND_USE_CASE_DEV_USB_PROXY_RX_SPEAKER); /* USB PROXY RX + SPEAKER */
 #endif
         } else if ((devices & AudioSystem::DEVICE_OUT_ANLG_DOCK_HEADSET) ||
                   (devices & AudioSystem::DEVICE_OUT_DGTL_DOCK_HEADSET)) {
@@ -1586,7 +1589,11 @@ char* ALSADevice::getUCMDevice(uint32_t devices, int input, char *rxDevice)
                 return strdup(SND_USE_CASE_DEV_EARPIECE); /* HANDSET RX */
             }
         } else if (devices & AudioSystem::DEVICE_OUT_SPEAKER) {
-            return strdup(SND_USE_CASE_DEV_SPEAKER); /* SPEAKER RX */
+            if (mCallMode == AUDIO_MODE_IN_CALL) {
+                return strdup(SND_USE_CASE_DEV_VOC_SPEAKER); /* Voice SPEAKER RX */
+            } else {
+                return strdup(SND_USE_CASE_DEV_SPEAKER); /* SPEAKER RX */
+            }
         } else if ((devices & AudioSystem::DEVICE_OUT_WIRED_HEADSET) ||
                    (devices & AudioSystem::DEVICE_OUT_WIRED_HEADPHONE)) {
             if (mDevSettingsFlag & ANC_FLAG) {
@@ -1640,7 +1647,11 @@ char* ALSADevice::getUCMDevice(uint32_t devices, int input, char *rxDevice)
             return strdup(SND_USE_CASE_DEV_FM_TX); /* FM Tx */
 #endif
         } else if (devices & AudioSystem::DEVICE_OUT_DEFAULT) {
-            return strdup(SND_USE_CASE_DEV_SPEAKER); /* SPEAKER RX */
+            if (mCallMode == AUDIO_MODE_IN_CALL) {
+                return strdup(SND_USE_CASE_DEV_VOC_SPEAKER); /* Voice SPEAKER RX */
+            } else {
+                return strdup(SND_USE_CASE_DEV_SPEAKER); /* SPEAKER RX */
+            }
         } else {
             ALOGD("No valid output device: %u", devices);
         }
@@ -1677,7 +1688,13 @@ char* ALSADevice::getUCMDevice(uint32_t devices, int input, char *rxDevice)
                         (strlen(SND_USE_CASE_DEV_SPEAKER)+1))) ||
                         ((rxDevice == NULL) &&
                         !strncmp(mCurRxUCMDevice, SND_USE_CASE_DEV_SPEAKER,
-                        (strlen(SND_USE_CASE_DEV_SPEAKER)+1)))) {
+                        (strlen(SND_USE_CASE_DEV_SPEAKER)+1))) ||
+                        ((rxDevice != NULL) &&
+                        !strncmp(rxDevice, SND_USE_CASE_DEV_VOC_SPEAKER,
+                        (strlen(SND_USE_CASE_DEV_VOC_SPEAKER)+1))) ||
+                        ((rxDevice == NULL) &&
+                        !strncmp(mCurRxUCMDevice, SND_USE_CASE_DEV_VOC_SPEAKER,
+                        (strlen(SND_USE_CASE_DEV_VOC_SPEAKER)+1)))) {
                         if (mFluenceMode == FLUENCE_MODE_ENDFIRE) {
                             if (mIsSglte == false) {
                                 return strdup(SND_USE_CASE_DEV_SPEAKER_DUAL_MIC_ENDFIRE); /* DUALMIC EF TX */
@@ -1709,7 +1726,13 @@ char* ALSADevice::getUCMDevice(uint32_t devices, int input, char *rxDevice)
                         (strlen(SND_USE_CASE_DEV_SPEAKER)+1))) ||
                         ((rxDevice == NULL) &&
                         !strncmp(mCurRxUCMDevice, SND_USE_CASE_DEV_SPEAKER,
-                        (strlen(SND_USE_CASE_DEV_SPEAKER)+1)))) {
+                        (strlen(SND_USE_CASE_DEV_SPEAKER)+1))) ||
+                        ((rxDevice != NULL) &&
+                        !strncmp(rxDevice, SND_USE_CASE_DEV_VOC_SPEAKER,
+                        (strlen(SND_USE_CASE_DEV_VOC_SPEAKER)+1))) ||
+                        ((rxDevice == NULL) &&
+                        !strncmp(mCurRxUCMDevice, SND_USE_CASE_DEV_VOC_SPEAKER,
+                        (strlen(SND_USE_CASE_DEV_VOC_SPEAKER)+1)))) {
                             if (mIsSglte == false) {
                                 return strdup(SND_USE_CASE_DEV_SPEAKER_DUAL_MIC_STEREO); /* DUALMIC EF TX */
                             }
@@ -1730,7 +1753,13 @@ char* ALSADevice::getUCMDevice(uint32_t devices, int input, char *rxDevice)
                         (strlen(SND_USE_CASE_DEV_SPEAKER)+1))) ||
                         ((rxDevice == NULL) &&
                         !strncmp(mCurRxUCMDevice, SND_USE_CASE_DEV_SPEAKER,
-                        (strlen(SND_USE_CASE_DEV_SPEAKER)+1)))) {
+                        (strlen(SND_USE_CASE_DEV_SPEAKER)+1))) ||
+                        ((rxDevice != NULL) &&
+                        !strncmp(rxDevice, SND_USE_CASE_DEV_VOC_SPEAKER,
+                        (strlen(SND_USE_CASE_DEV_VOC_SPEAKER)+1))) ||
+                        ((rxDevice == NULL) &&
+                        !strncmp(mCurRxUCMDevice, SND_USE_CASE_DEV_VOC_SPEAKER,
+                        (strlen(SND_USE_CASE_DEV_VOC_SPEAKER)+1)))) {
                             return strdup(SND_USE_CASE_DEV_QUAD_MIC); /* QUADMIC TX */
                     } else {
                         return strdup(SND_USE_CASE_DEV_LINE);
