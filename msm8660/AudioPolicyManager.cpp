@@ -86,12 +86,12 @@ audio_devices_t AudioPolicyManager::getDeviceForStrategy(routing_strategy strate
         switch (mForceUse[AudioSystem::FOR_COMMUNICATION]) {
         case AudioSystem::FORCE_BT_SCO:
             if (!isInCall() || strategy != STRATEGY_DTMF) {
-                device = mAvailableOutputDevices & AUDIO_DEVICE_OUT_BLUETOOTH_SCO_CARKIT;
+                device = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_BLUETOOTH_SCO_CARKIT;
                 if (device) break;
             }
-            device = mAvailableOutputDevices & AUDIO_DEVICE_OUT_BLUETOOTH_SCO_HEADSET;
+            device = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_BLUETOOTH_SCO_HEADSET;
             if (device) break;
-            device = mAvailableOutputDevices & AUDIO_DEVICE_OUT_BLUETOOTH_SCO;
+            device = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_BLUETOOTH_SCO;
             if (device) break;
             // if SCO device is requested but no SCO device is available, fall back to default case
             // FALL THROUGH
@@ -101,26 +101,27 @@ audio_devices_t AudioPolicyManager::getDeviceForStrategy(routing_strategy strate
             if (mHasA2dp && !isInCall() &&
                     (mForceUse[AudioSystem::FOR_MEDIA] != AudioSystem::FORCE_NO_BT_A2DP) &&
                     (getA2dpOutput() != 0) && !mA2dpSuspended) {
-                device = mAvailableOutputDevices & AUDIO_DEVICE_OUT_BLUETOOTH_A2DP;
+                device = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_BLUETOOTH_A2DP;
                 if (device) break;
-                device = mAvailableOutputDevices & AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES;
+                device = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES;
                 if (device) break;
             }
-            device = mAvailableOutputDevices & AUDIO_DEVICE_OUT_WIRED_HEADPHONE;
+
+            device = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_WIRED_HEADPHONE;
             if (device) break;
-            device = mAvailableOutputDevices & AUDIO_DEVICE_OUT_WIRED_HEADSET;
+            device = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_WIRED_HEADSET;
             if (device) break;
             device = mAvailableOutputDevices & AUDIO_DEVICE_OUT_USB_ACCESSORY;
             if (device) break;
             device = mAvailableOutputDevices & AUDIO_DEVICE_OUT_USB_DEVICE;
             if (device) break;
-            device = mAvailableOutputDevices & AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET;
+            device = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_DGTL_DOCK_HEADSET;
             if (device) break;
-            device = mAvailableOutputDevices & AUDIO_DEVICE_OUT_AUX_DIGITAL;
+            device = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_AUX_DIGITAL;
             if (device) break;
-            device = mAvailableOutputDevices & AUDIO_DEVICE_OUT_ANLG_DOCK_HEADSET;
+            device = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_ANLG_DOCK_HEADSET;
             if (device) break;
-            device = mAvailableOutputDevices & AUDIO_DEVICE_OUT_EARPIECE;
+            device = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_EARPIECE;
             if (device) break;
             device = mDefaultOutputDevice;
             if (device == 0) {
@@ -134,20 +135,20 @@ audio_devices_t AudioPolicyManager::getDeviceForStrategy(routing_strategy strate
             if (mHasA2dp && !isInCall() &&
                     (mForceUse[AudioSystem::FOR_MEDIA] != AudioSystem::FORCE_NO_BT_A2DP) &&
                     (getA2dpOutput() != 0) && !mA2dpSuspended) {
-                device = mAvailableOutputDevices & AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER;
+                device = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER;
                 if (device) break;
             }
             device = mAvailableOutputDevices & AUDIO_DEVICE_OUT_USB_ACCESSORY;
             if (device) break;
             device = mAvailableOutputDevices & AUDIO_DEVICE_OUT_USB_DEVICE;
             if (device) break;
-            device = mAvailableOutputDevices & AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET;
+            device = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_DGTL_DOCK_HEADSET;
             if (device) break;
-            device = mAvailableOutputDevices & AUDIO_DEVICE_OUT_AUX_DIGITAL;
+            device = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_AUX_DIGITAL;
             if (device) break;
-            device = mAvailableOutputDevices & AUDIO_DEVICE_OUT_ANLG_DOCK_HEADSET;
+            device = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_ANLG_DOCK_HEADSET;
             if (device) break;
-            device = mAvailableOutputDevices & AUDIO_DEVICE_OUT_SPEAKER;
+            device = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_SPEAKER;
             if (device) break;
             device = mDefaultOutputDevice;
             if (device == 0) {
@@ -155,12 +156,13 @@ audio_devices_t AudioPolicyManager::getDeviceForStrategy(routing_strategy strate
             }
             break;
         }
+
 #if defined(QCOM_FM_ENABLED) || defined(STE_FM)
-        if (mAvailableOutputDevices & AUDIO_DEVICE_OUT_FM) {
-            device |= AUDIO_DEVICE_OUT_FM;
+        if (mAvailableOutputDevices & AudioSystem::DEVICE_OUT_FM) {
+            device |= AudioSystem::DEVICE_OUT_FM;
             if (mForceUse[AudioSystem::FOR_MEDIA] == AudioSystem::FORCE_SPEAKER) {
-                device &= ~(AUDIO_DEVICE_OUT_WIRED_HEADSET);
-                device |= AUDIO_DEVICE_OUT_SPEAKER;
+                device &= ~(AudioSystem::DEVICE_OUT_WIRED_HEADSET);
+                device |= AudioSystem::DEVICE_OUT_SPEAKER;
             }
         }
 #endif
@@ -184,7 +186,7 @@ audio_devices_t AudioPolicyManager::getDeviceForStrategy(routing_strategy strate
 
         if (strategy == STRATEGY_SONIFICATION ||
                 !mStreams[AUDIO_STREAM_ENFORCED_AUDIBLE].mCanBeMuted) {
-            device = mAvailableOutputDevices & AUDIO_DEVICE_OUT_SPEAKER;
+            device = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_SPEAKER;
             if (device == 0) {
                 ALOGE("getDeviceForStrategy() speaker device not found for STRATEGY_SONIFICATION");
             }
@@ -201,23 +203,23 @@ audio_devices_t AudioPolicyManager::getDeviceForStrategy(routing_strategy strate
         uint32_t device2 = 0;
         if ((mHasA2dp && (mForceUse[AudioSystem::FOR_MEDIA] != AudioSystem::FORCE_NO_BT_A2DP) &&
                 (getA2dpOutput() != 0) && !mA2dpSuspended )) {
-            device2 = mAvailableOutputDevices & AUDIO_DEVICE_OUT_BLUETOOTH_A2DP;
+            device2 = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_BLUETOOTH_A2DP;
             if (device2 == 0) {
-                device2 = mAvailableOutputDevices & AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES;
+                device2 = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES;
             }
             if (device2 == 0) {
-                device2 = mAvailableOutputDevices & AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER;
+                device2 = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER;
             }
         }
         if (device2 == 0) {
-            device2 = mAvailableOutputDevices & AUDIO_DEVICE_OUT_WIRED_HEADPHONE;
+            device2 = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_WIRED_HEADPHONE;
         }
         if (device2 == 0) {
-            device2 = mAvailableOutputDevices & AUDIO_DEVICE_OUT_WIRED_HEADSET;
+            device2 = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_WIRED_HEADSET;
         }
 #if defined(QCOM_FM_ENABLED) || defined(STE_FM)
         if (device2 == 0) {
-            device2 = mAvailableOutputDevices & AUDIO_DEVICE_OUT_FM_TX;
+            device2 = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_FM_TX;
         }
 #endif
         if (device2 == 0) {
@@ -227,16 +229,16 @@ audio_devices_t AudioPolicyManager::getDeviceForStrategy(routing_strategy strate
             device2 = mAvailableOutputDevices & AUDIO_DEVICE_OUT_USB_DEVICE;
         }
         if (device2 == 0) {
-            device2 = mAvailableOutputDevices & AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET;
+            device2 = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_DGTL_DOCK_HEADSET;
         }
         if (device2 == 0) {
-            device2 = mAvailableOutputDevices & AUDIO_DEVICE_OUT_AUX_DIGITAL;
+            device2 = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_AUX_DIGITAL;
         }
         if (device2 == 0) {
-            device2 = mAvailableOutputDevices & AUDIO_DEVICE_OUT_ANLG_DOCK_HEADSET;
+            device2 = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_ANLG_DOCK_HEADSET;
         }
         if (device2 == 0) {
-            device2 = mAvailableOutputDevices & AUDIO_DEVICE_OUT_SPEAKER;
+            device2 = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_SPEAKER;
         }
 
         // device is DEVICE_OUT_SPEAKER if we come from case STRATEGY_SONIFICATION or
@@ -248,12 +250,12 @@ audio_devices_t AudioPolicyManager::getDeviceForStrategy(routing_strategy strate
         break;
 
         case AudioSystem::FORCE_SPEAKER:
-            device = mAvailableOutputDevices & AUDIO_DEVICE_OUT_SPEAKER;
+            device = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_SPEAKER;
             break;
         }
 #if defined(QCOM_FM_ENABLED) || defined(STE_FM)
-        if (mAvailableOutputDevices & AUDIO_DEVICE_OUT_FM) {
-            device |= AUDIO_DEVICE_OUT_FM;
+        if (mAvailableOutputDevices & AudioSystem::DEVICE_OUT_FM) {
+            device |= AudioSystem::DEVICE_OUT_FM;
         }
 #endif
         // Do not play media stream if in call and the requested device would change the hardware
@@ -387,7 +389,7 @@ status_t AudioPolicyManager::setDeviceConnectionState(audio_devices_t device,
 #ifdef QCOM_FM_ENABLED
 
         audio_devices_t NewDevice = AudioPolicyManagerBase::getNewDevice(mPrimaryOutput, false /*fromCache*/);
-        if (device == AUDIO_DEVICE_OUT_FM) {
+        if (device == AudioSystem::DEVICE_OUT_FM) {
             if (state == AudioSystem::DEVICE_STATE_AVAILABLE) {
                 mOutputs.valueFor(mPrimaryOutput)->changeRefCount(AudioSystem::FM, 1);
             }
@@ -1259,10 +1261,10 @@ audio_devices_t AudioPolicyManager::getDeviceForInputSource(int inputSource)
 
 #if defined (QCOM_FM_ENABLED) || defined(STE_FM)
    case AUDIO_SOURCE_FM_RX:
-        device = AUDIO_DEVICE_IN_FM_RX;
+        device = AudioSystem::DEVICE_IN_FM_RX;
         break;
     case AUDIO_SOURCE_FM_RX_A2DP:
-        device = AUDIO_DEVICE_IN_FM_RX_A2DP;
+        device = AudioSystem::DEVICE_IN_FM_RX_A2DP;
         break;
 #endif
     default:
