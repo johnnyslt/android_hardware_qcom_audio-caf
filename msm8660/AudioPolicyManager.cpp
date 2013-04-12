@@ -1234,7 +1234,7 @@ audio_devices_t AudioPolicyManager::getDeviceForInputSource(int inputSource)
         }
         break;
     case AUDIO_SOURCE_VOICE_COMMUNICATION:
-        device = AUDIO_DEVICE_IN_COMMUNICATION;
+        device = AudioSystem::DEVICE_IN_COMMUNICATION;
         break;
 
     case AUDIO_SOURCE_CAMCORDER:
