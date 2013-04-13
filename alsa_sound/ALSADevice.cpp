@@ -359,7 +359,11 @@ status_t ALSADevice::setHardwareParams(alsa_handle_t *handle)
                    format);
     param_set_mask(params, SNDRV_PCM_HW_PARAM_SUBFORMAT,
                    SNDRV_PCM_SUBFORMAT_STD);
+#ifdef SET_MIN_PERIOD_BYTES
+    param_set_min(params, SNDRV_PCM_HW_PARAM_PERIOD_BYTES, reqBuffSize);
+#else
     param_set_int(params, SNDRV_PCM_HW_PARAM_PERIOD_BYTES, reqBuffSize);
+#endif
     param_set_int(params, SNDRV_PCM_HW_PARAM_SAMPLE_BITS, 16);
     param_set_int(params, SNDRV_PCM_HW_PARAM_FRAME_BITS,
                    channels * 16);
@@ -774,7 +778,11 @@ status_t ALSADevice::open(alsa_handle_t *handle)
         (!strcmp(handle->useCase, SND_USE_CASE_MOD_PLAY_TUNNEL))) {
         ALOGV("LPA/tunnel use case");
         flags |= PCM_MMAP;
+
+#ifdef SET_PCM_DEBUG_FLAG
         flags |= DEBUG_ON;
+#endif
+
     } else if ((!strcmp(handle->useCase, SND_USE_CASE_VERB_HIFI)) ||
         (!strcmp(handle->useCase, SND_USE_CASE_VERB_HIFI2)) ||
         (!strcmp(handle->useCase, SND_USE_CASE_VERB_HIFI_LOWLATENCY_MUSIC)) ||
@@ -2346,7 +2354,11 @@ status_t ALSADevice::openProxyDevice()
 {
     struct snd_pcm_hw_params *params = NULL;
     struct snd_pcm_sw_params *sparams = NULL;
-    int flags = (DEBUG_ON | PCM_MMAP| PCM_STEREO | PCM_IN);
+    int flags = (PCM_MMAP| PCM_STEREO | PCM_IN);
+
+#ifdef SET_PCM_DEBUG_FLAG
+    flags |= DEBUG_ON;
+#endif
 
     ALOGV("openProxyDevice");
     mProxyParams.mProxyPcmHandle = pcm_open(flags, PROXY_CAPTURE_DEVICE_NAME);
