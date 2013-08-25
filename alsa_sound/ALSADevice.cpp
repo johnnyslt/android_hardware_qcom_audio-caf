@@ -1737,29 +1737,23 @@ char* ALSADevice::getUCMDevice(uint32_t devices, int input, char *rxDevice)
             return strdup(SND_USE_CASE_DEV_PROXY_RX);
         } else if ((devices & AudioSystem::DEVICE_OUT_ANLG_DOCK_HEADSET ||
                     devices & AudioSystem::DEVICE_OUT_DGTL_DOCK_HEADSET) &&
+                    mCallMode != AUDIO_MODE_IN_CALL &&
                     devices & AudioSystem::DEVICE_OUT_SPEAKER) {
-             ALOGD("getUCMDevice for output device: devices:%x is input device:%d, reached debug #1",devices,input);
-#ifdef DOCK_USBAUDIO_ENABLED
-             if (mCallMode == AUDIO_MODE_RINGTONE) {
-                 return strdup(SND_USE_CASE_DEV_SPEAKER); /* Voice SPEAKER RX */
-             } else {
-                 return strdup(SND_USE_CASE_DEV_DOCK);
-             }
-#else
-             return strdup(SND_USE_CASE_DEV_USB_PROXY_RX_SPEAKER); /* USB PROXY RX + SPEAKER */
+#ifdef SAMSUNG_AUDIO
+            if (AudioUtil::isSamsungDockConnected()) {
+                return strdup(SND_USE_CASE_DEV_DOCK);
+            }
 #endif
-        } else if ((devices & AudioSystem::DEVICE_OUT_ANLG_DOCK_HEADSET) ||
-                  (devices & AudioSystem::DEVICE_OUT_DGTL_DOCK_HEADSET)) {
-             ALOGD("getUCMDevice for output device: devices:%x is input device:%d, reached debug #2",devices,input);
-#ifdef DOCK_USBAUDIO_ENABLED
-             if (mCallMode == AUDIO_MODE_RINGTONE) {
-                 return strdup(SND_USE_CASE_DEV_USB_PROXY_RX); /* PROXY RX */
-             } else {
-                 return strdup(SND_USE_CASE_DEV_DOCK); /* Dock RX */
-             }
-#else
-             return strdup(SND_USE_CASE_DEV_USB_PROXY_RX); /* PROXY RX */
+            return strdup(SND_USE_CASE_DEV_USB_PROXY_RX_SPEAKER); /* USB PROXY RX + SPEAKER */
+        } else if (((devices & AudioSystem::DEVICE_OUT_ANLG_DOCK_HEADSET) ||
+                  (devices & AudioSystem::DEVICE_OUT_DGTL_DOCK_HEADSET)) &&
+                  mCallMode != AUDIO_MODE_IN_CALL) {
+#ifdef SAMSUNG_AUDIO
+            if (AudioUtil::isSamsungDockConnected()) {
+                return strdup(SND_USE_CASE_DEV_DOCK); /* Dock RX */
+            }
 #endif
+            return strdup(SND_USE_CASE_DEV_USB_PROXY_RX); /* PROXY RX */
 #ifdef QCOM_PROXY_DEVICE_ENABLED
         } else if( (devices & AudioSystem::DEVICE_OUT_SPEAKER) &&
                    (devices & AudioSystem::DEVICE_OUT_PROXY) &&
@@ -1826,15 +1820,13 @@ char* ALSADevice::getUCMDevice(uint32_t devices, int input, char *rxDevice)
                 return strdup(SND_USE_CASE_DEV_EARPIECE); /* HANDSET RX */
             }
         } else if (devices & AudioSystem::DEVICE_OUT_SPEAKER) {
-#ifdef SEPERATED_VOICE_SPEAKER
 #ifdef SEPERATED_VOIP
             if (mCallMode == AUDIO_MODE_IN_COMMUNICATION) {
                 return strdup(SND_USE_CASE_DEV_VOIP_SPEAKER);
-            } else if (mCallMode == AUDIO_MODE_IN_CALL) {
-#else
-            if (mCallMode == AUDIO_MODE_IN_CALL ||
-                mCallMode == AUDIO_MODE_IN_COMMUNICATION) {
+            }
 #endif
+#ifdef SEPERATED_VOICE_SPEAKER
+            if (mCallMode == AUDIO_MODE_IN_CALL) {
                 return strdup(SND_USE_CASE_DEV_VOC_SPEAKER); /* Voice SPEAKER RX */
             }
 #endif
@@ -1928,7 +1920,11 @@ char* ALSADevice::getUCMDevice(uint32_t devices, int input, char *rxDevice)
             } else {
                 if ((mDevSettingsFlag & DMIC_FLAG) && (mInChannels == 1)) {
 #ifdef USES_FLUENCE_INCALL
-                  if (mCallMode == AUDIO_MODE_IN_CALL) {
+                  if (mCallMode == AUDIO_MODE_IN_CALL
+#ifdef USES_FLUENCE_FOR_VOIP
+                          || mCallMode == AUDIO_MODE_IN_COMMUNICATION
+#endif
+                     ) {
 #endif
                     if (((rxDevice != NULL) &&
                         (!strncmp(rxDevice, SND_USE_CASE_DEV_SPEAKER,
@@ -2666,7 +2662,6 @@ ssize_t  ALSADevice::readFromProxy(void **captureBuffer , ssize_t *bufferSize) {
         }
 
         mProxyParams.mAvail = pcm_avail(capture_handle);
-        mAvailInMs = (mProxyParams.mAvail*1000)/(AFE_PROXY_SAMPLE_RATE);
         ALOGV("avail is = %d frames = %ld, avai_min = %d\n",\
                       mProxyParams.mAvail,  mProxyParams.mFrames,(int)capture_handle->sw_p->avail_min);
         if (mProxyParams.mAvail < capture_handle->sw_p->avail_min) {
@@ -2700,69 +2695,32 @@ ssize_t  ALSADevice::readFromProxy(void **captureBuffer , ssize_t *bufferSize) {
         *bufferSize = 0;
         return err;
     }
-
-    //Copy only if we have data
-    if(mProxyParams.mAvail > 0) {
-        /* if we have reached high watermark, flush data */
-        if(mProxyParams.mAvail > AFE_PROXY_HIGH_WATER_MARK_FRAME_COUNT) {
-            /* throw out everything over here */
-            ALOGE("available buffers in proxy %d has reached high water mark %d, throw it out ", mProxyParams.mAvail, AFE_PROXY_HIGH_WATER_MARK_FRAME_COUNT);
-            capture_handle->sync_ptr->c.control.appl_ptr += mProxyParams.mAvail;
-            capture_handle->sync_ptr->flags = 0;
-            err = sync_ptr(capture_handle);
-            if(err == EPIPE) {
-                ALOGV("Failed in sync_ptr \n");
-                capture_handle->running = 0;
-                err = sync_ptr(capture_handle);
-            }
-            err = FAILED_TRANSACTION;
-            *captureBuffer = NULL;
-            *bufferSize = 0;
-            return err;
-        }
-        if(mProxyParams.mX.frames > mProxyParams.mAvail) {
-            mProxyParams.mFrames = mProxyParams.mAvail;
-            ALOGE("Error mProxyParams.mFrames = %d", mProxyParams.mFrames);
-            /* Always copy only the data thats available */
-            /* case when we wake up with lesser no of bytes than 1 period */
-        }
-        else {
-            mProxyParams.mFrames = mProxyParams.mX.frames;
-        }
-
-        void *data  = dst_address(capture_handle);
-
-        if(mProxyParams.mCaptureBuffer == NULL)
-            mProxyParams.mCaptureBuffer =  malloc(mProxyParams.mCaptureBufferSize);
-
-        memcpy(mProxyParams.mCaptureBuffer, (char *)data,
-                (mProxyParams.mFrames * 2 * 2));
-
-        capture_handle->sync_ptr->c.control.appl_ptr += mProxyParams.mFrames;
-        capture_handle->sync_ptr->flags = 0;
-        *bufferSize = (mProxyParams.mFrames * 2 * 2);
-        mProxyParams.mFrames -= mProxyParams.mFrames;
-        ALOGV("Calling sync_ptr for proxy after sync with mFrames is %d", mProxyParams.mFrames);
+    if (mProxyParams.mX.frames > mProxyParams.mAvail)
+        mProxyParams.mFrames = mProxyParams.mAvail;
+    void *data  = dst_address(capture_handle);
+    //TODO: Return a pointer to AudioHardware
+    if(mProxyParams.mCaptureBuffer == NULL)
+        mProxyParams.mCaptureBuffer =  malloc(mProxyParams.mCaptureBufferSize);
+    memcpy(mProxyParams.mCaptureBuffer, (char *)data,
+             mProxyParams.mCaptureBufferSize);
+    mProxyParams.mX.frames -= mProxyParams.mFrames;
+    capture_handle->sync_ptr->c.control.appl_ptr += mProxyParams.mFrames;
+    capture_handle->sync_ptr->flags = 0;
+    ALOGV("Calling sync_ptr for proxy after sync");
+    err = sync_ptr(capture_handle);
+    if(err == EPIPE) {
+        ALOGV("Failed in sync_ptr \n");
+        capture_handle->running = 0;
         err = sync_ptr(capture_handle);
-        if(err == EPIPE) {
-            ALOGV("Failed in sync_ptr \n");
-            capture_handle->running = 0;
-            err = sync_ptr(capture_handle);
-        }
-        if(err != NO_ERROR ) {
-            ALOGE("Error: Sync ptr end returned %d", err);
-            *captureBuffer = NULL;
-            *bufferSize = 0;
-            return err;
-        }
-        *captureBuffer = mProxyParams.mCaptureBuffer;
-    } else {
-        /* If we dont have data to copy just return 0 */
+    }
+    if(err != NO_ERROR ) {
+        ALOGE("Error: Sync ptr end returned %d", err);
         *captureBuffer = NULL;
         *bufferSize = 0;
-        err = FAILED_TRANSACTION;
-        ALOGE("Error Nothing copied from Proxy");
+        return err;
     }
+    *captureBuffer = mProxyParams.mCaptureBuffer;
+    *bufferSize = mProxyParams.mCaptureBufferSize;
     return err;
 }
 

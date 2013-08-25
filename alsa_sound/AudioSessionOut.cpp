@@ -304,7 +304,12 @@ ssize_t AudioSessionOutALSA::write(const void *buffer, size_t bytes)
         mSkipWrite = false;
         ALOGD("mSkipWrite is false now write bytes %d", bytes);
         ALOGD("skipping buffer in write");
-        return 0;
+
+        /* returning the bytes itself as we are skipping write.
+         * This is considered as successfull write.
+         * Skipping write could be because of a flush.
+         */
+        return bytes;
     }
 
     ALOGV("not skipping buffer in write since mSkipWrite = %d, "
@@ -337,6 +342,7 @@ ssize_t AudioSessionOutALSA::write(const void *buffer, size_t bytes)
             if (mFilledQueue.empty()) {
                 mFilledQueue.push_back(buf);
             }
+            return bytes;
         }
 
         return err;
@@ -365,7 +371,13 @@ ssize_t AudioSessionOutALSA::write(const void *buffer, size_t bytes)
     int32_t * Buf = (int32_t *) buf.memBuf;
     ALOGV(" buf.memBuf [0] = %x , buf.memBuf [1] = %x",  Buf[0], Buf[1]);
     mFilledQueue.push_back(buf);
-    return err;
+    if(!err) {
+       //return the bytes written to HAL if write is successful.
+       return bytes;
+    } else {
+       //else condition return err value returned
+       return err;
+    }
 }
 
 void AudioSessionOutALSA::bufferAlloc(alsa_handle_t *handle) {
@@ -716,11 +728,12 @@ status_t AudioSessionOutALSA::stop()
 
 status_t AudioSessionOutALSA::standby()
 {
-    Mutex::Autolock autoLock(mParent->mLock);
     // At this point, all the buffers with the driver should be
     // flushed.
     status_t err = NO_ERROR;
     flush();
+    Mutex::Autolock autoLock(mParent->mLock);
+
     mAlsaHandle->module->standby(mAlsaHandle);
     if (mParent->mRouteAudioToExtOut) {
          ALOGD("Standby - stopPlaybackOnExtOut_l - mUseCase = %d",mUseCase);
@@ -738,23 +751,7 @@ status_t AudioSessionOutALSA::standby()
 uint32_t AudioSessionOutALSA::latency() const
 {
     // Android wants latency in milliseconds.
-    uint32_t latency = mAlsaHandle->latency;
-    if ( ((mParent->mCurRxDevice & AudioSystem::DEVICE_OUT_ALL_A2DP) &&
-         (mParent->mExtOutStream == mParent->mA2dpStream))
-         && (mParent->mA2dpStream != NULL) ) {
-        uint32_t bt_latency = mParent->mA2dpStream->get_latency(mParent->mA2dpStream);
-        uint32_t proxy_latency = mParent->mALSADevice->mAvailInMs;
-        latency += bt_latency*1000 + proxy_latency*1000;
-        ALOGV("latency = %d, bt_latency = %d, proxy_latency = %d", latency, bt_latency, proxy_latency);
-    }
-    else if ( ((mParent->mCurRxDevice & AudioSystem::DEVICE_OUT_ALL_USB) &&
-         (mParent->mExtOutStream == mParent->mUsbStream))
-         && (mParent->mUsbStream != NULL) ) {
-        uint32_t usb_latency = mParent->mUsbStream->get_latency(mParent->mUsbStream);
-        latency += usb_latency*1000;
-    }
-
-    return USEC_TO_MSEC (latency);
+    return USEC_TO_MSEC (mAlsaHandle->latency);
 }
 
 status_t AudioSessionOutALSA::setObserver(void *observer)
